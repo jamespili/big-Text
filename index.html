@@ -28,7 +28,7 @@
         .top-bar h1 { margin: 0; font-size: 18px; color: #333; }
         .top-bar p { margin: 5px 0 0; font-size: 12px; color: #888; }
 
-        /* 画布区 - 类似朋友圈/漫画的流式布局 */
+        /* 画布区 */
         #scroll-area { flex: 1; overflow-y: auto; padding: 15px 10px 150px; }
         
         #tutorial-canvas { 
@@ -36,22 +36,23 @@
             padding-bottom: 20px;
         }
 
-        /* 每一步的容器 */
+        /* 每一步的容器（关键：设为 relative 以便内部红圈绝对定位） */
         .step-block {
-            position: relative; margin-bottom: 30px; 
-            background: #fff; border-radius: 12px; overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            border: 2px solid #000;
+            position: relative; margin-bottom: 35px; 
         }
-        .step-block img { width: 100%; display: block; }
+        .step-block img { 
+            width: 100%; display: block; 
+            border-radius: 12px; border: 2px solid #000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
         
         /* 漫画风格的步骤标签 */
         .step-tag {
-            position: absolute; top: 10px; left: 10px;
+            position: absolute; top: -12px; left: 10px;
             background: var(--step-yellow); color: #000;
             font-weight: 900; padding: 5px 15px; border-radius: 5px;
             border: 3px solid #000; transform: rotate(-2deg);
-            box-shadow: 3px 3px 0 #000; z-index: 10;
+            box-shadow: 3px 3px 0 #000; z-index: 10; pointer-events: none;
         }
 
         /* 引导圈样式 */
@@ -70,7 +71,7 @@
             position: absolute; left: 40px; top: -50px;
             background: #fff; border: 4px solid var(--primary-red);
             padding: 8px 15px; border-radius: 15px; white-space: nowrap;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); pointer-events: auto;
         }
         .bubble-text { color: var(--primary-red); font-size: 28px; font-weight: 900; }
         .bubble-num {
@@ -78,7 +79,7 @@
             background: var(--primary-red); color: #fff;
             width: 30px; height: 30px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-size: 16px; border: 2px solid #fff;
+            font-size: 16px; border: 2px solid #fff; font-weight: bold;
         }
 
         /* 底部操作面板 */
@@ -89,13 +90,16 @@
             box-shadow: 0 -5px 20px rgba(0,0,0,0.05); z-index: 200;
         }
 
-        .edit-list { max-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
-        .edit-item { display: flex; align-items: center; gap: 10px; background: #f9f9f9; padding: 5px 10px; border-radius: 8px; }
-        .edit-item input { flex: 1; border: none; background: transparent; font-size: 16px; padding: 5px; font-weight: bold; }
+        .edit-list { max-height: 90px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        .edit-item { display: flex; align-items: center; gap: 8px; background: #f9f9f9; padding: 6px 10px; border-radius: 8px; }
+        .step-badge { font-size: 12px; background: #e0e0e0; color: #555; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .local-count { color: var(--primary-red); font-weight: bold; font-size: 16px; width: 20px; text-align: center; }
+        .edit-item input { flex: 1; border: none; background: transparent; font-size: 16px; padding: 5px; font-weight: bold; outline: none; }
+        .edit-item .del-btn { color: #ccc; font-size: 24px; padding: 0 5px; cursor: pointer; }
 
         .btn-group { display: flex; gap: 10px; }
         .btn {
-            flex: 1; height: 55px; border-radius: 15px; border: none;
+            flex: 1; height: 50px; border-radius: 12px; border: none;
             font-size: 16px; font-weight: bold; display: flex;
             align-items: center; justify-content: center; gap: 8px;
         }
@@ -103,27 +107,22 @@
         .btn-save { background: var(--primary-red); color: #fff; }
         .btn-clear { background: #eee; color: #666; flex: 0.4; }
 
-        /* 隐藏的文件输入 */
         #file-input { display: none; }
-
-        /* 空白提示 */
-        #empty-hint {
-            text-align: center; padding: 100px 20px; color: #aaa;
-        }
+        #empty-hint { text-align: center; padding: 80px 20px; color: #aaa; }
     </style>
 </head>
 <body>
 
 <div class="top-bar">
     <h1>给爸妈的漫画教程</h1>
-    <p>点击下方添加图片，点图上的位置写指令</p>
+    <p>一次选多张图，每张图的“点这里”都独立从 1 开始</p>
 </div>
 
 <div id="scroll-area">
-    <div id="tutorial-canvas" onclick="handleCanvasClick(event)">
+    <div id="tutorial-canvas">
         <div id="empty-hint">
-            <div style="font-size: 50px;">📸</div>
-            <p>点击下方“添加下一步”<br>从手机相册选截图</p>
+            <div style="font-size: 50px; margin-bottom: 10px;">📸</div>
+            <p>点击下方“添加图层”<br>可同时在相册勾选多张截图</p>
         </div>
         <div id="steps-container"></div>
     </div>
@@ -133,9 +132,9 @@
     <div class="edit-list" id="edit-list"></div>
     
     <div class="btn-group">
-        <button class="btn btn-clear" onclick="location.reload()">清空</button>
+        <button class="btn btn-clear" onclick="location.reload()">重来</button>
         <button class="btn btn-add" onclick="document.getElementById('file-input').click()">
-            <span>➕</span>添加下一步
+            <span>➕</span>添加步骤
         </button>
         <button class="btn btn-save" onclick="generateLongImage()">
             <span>💾</span>保存长图
@@ -145,57 +144,72 @@
 </div>
 
 <script>
-    let stepCount = 0;
-    let markerCount = 0;
-    const canvas = document.getElementById('tutorial-canvas');
+    let globalStepCount = 0;
     const stepsContainer = document.getElementById('steps-container');
     const editList = document.getElementById('edit-list');
     const emptyHint = document.getElementById('empty-hint');
 
-    // 加载图片并生成步骤
-    function loadImages(event) {
-        const files = event.target.files;
+    // 核心修复1：使用 async/await 确保同时选多图时，顺序和步骤编号严格一致
+    async function loadImages(event) {
+        const files = Array.from(event.target.files);
         if (!files.length) return;
-
         emptyHint.style.display = 'none';
 
-        Array.from(files).forEach(file => {
-            stepCount++;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const block = document.createElement('div');
-                block.className = 'step-block';
-                block.innerHTML = `
-                    <div class="step-tag">第 ${stepCount} 步</div>
-                    <img src="${e.target.result}">
-                `;
-                stepsContainer.appendChild(block);
-                
-                // 滚动到最新添加的图
-                setTimeout(() => {
-                    block.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-            };
-            reader.readAsDataURL(file);
-        });
-        event.target.value = ''; // 重置以支持重复上传
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            globalStepCount++;
+            const currentStep = globalStepCount; // 锁定当前步骤编号
+            
+            // 等待图片读取完成
+            const dataUrl = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+
+            // 创建步骤容器
+            const block = document.createElement('div');
+            block.className = 'step-block';
+            block.dataset.step = currentStep; // 记录这是第几步
+            block.dataset.markerCount = 0;    // 核心修复2：局部计数器初始化为 0
+
+            block.innerHTML = `
+                <div class="step-tag">第 ${currentStep} 步</div>
+                <img src="${dataUrl}">
+            `;
+            
+            // 将点击事件绑定在具体的图片区块上
+            block.onclick = function(e) { addMarker(e, block); };
+            stepsContainer.appendChild(block);
+        }
+        
+        // 滑动到底部
+        setTimeout(() => {
+            stepsContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 100);
+        
+        event.target.value = ''; // 允许重复选择同一张图
     }
 
-    // 点击画布添加标注
-    function handleCanvasClick(event) {
-        // 如果点的是输入框或按钮则不触发
-        if (event.target.tagName === 'INPUT' || event.target.closest('.btn-group')) return;
-        if (stepCount === 0) return;
+    // 在指定的图片区块内添加红圈
+    function addMarker(event, block) {
+        // 防止点到已有的批注上重复添加
+        if (event.target.closest('.marker')) return;
 
-        const rect = canvas.getBoundingClientRect();
+        // 获取点击位置相对于当前这一张图（block）的坐标
+        const rect = block.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        markerCount++;
+        // 局部计数器 +1
+        let count = parseInt(block.dataset.markerCount) + 1;
+        block.dataset.markerCount = count;
+        const stepNum = block.dataset.step;
+
         const id = 'marker-' + Date.now();
         const defaultText = "点这里！";
 
-        // 1. 创建图上的标记
+        // 生成图上红圈（直接加在对应的 block 里，相对定位）
         const marker = document.createElement('div');
         marker.className = 'marker';
         marker.id = id;
@@ -204,67 +218,87 @@
         marker.innerHTML = `
             <div class="rings"><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div>
             <div class="bubble">
-                <div class="bubble-num">${markerCount}</div>
+                <div class="bubble-num">${count}</div>
                 <div class="bubble-text" id="text-on-img-${id}">${defaultText}</div>
             </div>
         `;
-        canvas.appendChild(marker);
+        block.appendChild(marker);
 
-        // 2. 创建底部编辑项
+        // 生成底部对应的编辑框，加上了“图X”的提示标签
         const editItem = document.createElement('div');
         editItem.className = 'edit-item';
         editItem.id = 'edit-' + id;
         editItem.innerHTML = `
-            <span style="color:var(--primary-red);font-weight:bold;">#${markerCount}</span>
+            <span class="step-badge">图${stepNum}</span>
+            <span class="local-count">#${count}</span>
             <input type="text" value="${defaultText}" oninput="syncText('${id}', this.value)">
-            <span onclick="deleteMarker('${id}')" style="color:#ccc;font-size:20px;">×</span>
+            <span class="del-btn" onclick="deleteMarker('${id}', this)">×</span>
         `;
         editList.appendChild(editItem);
         
-        // 自动聚焦并滚动列表
+        // 自动聚焦并滚动底部列表
         editItem.querySelector('input').focus();
         editList.scrollTop = editList.scrollHeight;
     }
 
+    // 同步文字
     function syncText(id, val) {
-        document.getElementById('text-on-img-' + id).innerText = val || ' ';
+        const textEl = document.getElementById('text-on-img-' + id);
+        if(textEl) textEl.innerText = val || ' ';
     }
 
-    function deleteMarker(id) {
-        document.getElementById(id).remove();
-        document.getElementById('edit-' + id).remove();
+    // 删除并重新排局部编号
+    function deleteMarker(id, btnElement) {
+        document.getElementById(id)?.remove();
+        document.getElementById('edit-' + id)?.remove();
+        reindexMarkers();
+    }
+
+    // 重新整理所有局部的编号（删除了某个红圈后自动补齐序号）
+    function reindexMarkers() {
+        const blocks = document.querySelectorAll('.step-block');
+        blocks.forEach(block => {
+            const markers = block.querySelectorAll('.marker');
+            block.dataset.markerCount = markers.length; // 更新局部总数
+            
+            markers.forEach((marker, index) => {
+                const count = index + 1;
+                marker.querySelector('.bubble-num').innerText = count;
+                const editItem = document.getElementById('edit-' + marker.id);
+                if (editItem) {
+                    editItem.querySelector('.local-count').innerText = '#' + count;
+                }
+            });
+        });
     }
 
     // 生成最终长图
     async function generateLongImage() {
-        if (stepCount === 0) {
+        if (globalStepCount === 0) {
             alert("请先添加图片！");
             return;
         }
 
         const btn = document.querySelector('.btn-save');
         const originalText = btn.innerHTML;
-        btn.innerHTML = "正在生成长图...";
+        btn.innerHTML = "生成中...";
         btn.disabled = true;
 
-        // 隐藏不需要出现在截图里的元素
         try {
-            const resultCanvas = await html2canvas(canvas, {
+            const resultCanvas = await html2canvas(document.getElementById('tutorial-canvas'), {
                 useCORS: true,
-                scale: 2, // 提高清晰度
+                scale: 2, 
                 backgroundColor: "#f2f2f7",
                 scrollX: 0,
-                scrollY: -window.scrollY // 修复滚动偏移bug
+                scrollY: -window.scrollY
             });
 
-            // 在移动端，我们通常将图片显示在一个弹出层让用户长按保存
-            // 或者直接下载
             const link = document.createElement('a');
-            link.download = `给家长的教程_${Date.now()}.png`;
+            link.download = `给父母的教程_${Date.now()}.png`;
             link.href = resultCanvas.toDataURL('image/png');
             link.click();
             
-            alert("生成成功！请在下载管理或相册中查看。如果是微信内打开，请长按生成的图片保存（如果有弹出预览的话）。");
+            alert("✅ 生成成功！\n\n如果在微信内，请长按下方刚弹出的图片保存；如果在手机浏览器，已自动下载。");
         } catch (err) {
             console.error(err);
             alert("生成失败，请重试");
