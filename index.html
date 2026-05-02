@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<title>大字报截图批注器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --red: #E8211A;
+    --red-light: #FEF0EF;
+    --red-mid: #F97066;
+    --gray-bg: #F5F5F5;
+    --gray-border: #E5E5E5;
+    --gray-text: #999;
+    --text: #1A1A1A;
+    --white: #fff;
+    --radius: 14px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html, body {
+    height: 100%;
+    background: var(--gray-bg);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  /* ── Top bar ── */
+  #topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--white);
+    border-bottom: 0.5px solid var(--gray-border);
+  }
+  #btn-back {
+    width: 36px; height: 36px;
+    background: var(--gray-bg);
+    border: none;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  #btn-back svg { display: block; }
+  #topbar-title { text-align: center; }
+  #topbar-title h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  #topbar-title p { font-size: 12px; color: var(--gray-text); margin-top: 1px; }
+  #btn-clear {
+    height: 36px; padding: 0 14px;
+    background: var(--gray-bg);
+    border: none; border-radius: 10px;
+    font-size: 14px; color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* ── Hint bar ── */
+  #hint-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: #FFF8ED;
+    border-bottom: 0.5px solid #F5D99A;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #8A6500;
+  }
+  #hint-bar svg { flex-shrink: 0; }
+
+  /* ── Canvas area ── */
+  #canvas-area {
+    position: relative;
+    background: var(--white);
+    overflow: hidden;
+    touch-action: none;
+  }
+  #bg-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    position: absolute; top: 0; left: 0;
+  }
+  #anno-canvas {
+    position: absolute; top: 0; left: 0;
+    pointer-events: none;
+  }
+  #upload-prompt {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px;
+    color: var(--gray-text);
+    font-size: 14px;
+    pointer-events: none;
+  }
+  #upload-prompt .icon-wrap {
+    width: 64px; height: 64px;
+    background: var(--gray-bg);
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #tap-hint {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    color: white;
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    white-space: nowrap;
+    pointer-events: none;
+    display: none;
+  }
+
+  /* ── Step input panel ── */
+  #step-panel {
+    background: var(--white);
+    border-top: 0.5px solid var(--gray-border);
+    overflow: hidden;
+  }
+  .step-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--gray-border);
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .step-badge {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--red);
+    color: white;
+    font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-input {
+    flex: 1;
+    border: none; outline: none;
+    font-size: 16px; font-weight: 600;
+    color: var(--text);
+    font-family: inherit;
+    background: transparent;
+  }
+  .step-input::placeholder { color: var(--gray-text); font-weight: 400; }
+  .step-del {
+    width: 22px; height: 22px;
+    background: var(--gray-border);
+    border: none; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    color: #888;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  /* ── Bottom actions ── */
+  #action-bar {
+    background: var(--white);
+    border-top: 0.5px solid var(--gray-border);
+    padding: 10px 16px;
+    padding-bottom: calc(10px + var(--safe-bottom));
+  }
+  #action-row1 {
+    display: flex; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .action-btn {
+    flex: 1;
+    height: 52px;
+    border: none; border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-appearance: none;
+    transition: transform 0.1s, opacity 0.1s;
+  }
+  .action-btn:active { transform: scale(0.96); opacity: 0.85; }
+  .action-btn span { font-size: 12px; font-weight: 500; }
+  .action-btn.active { background: var(--red-light); }
+  .action-btn.active span { color: var(--red); }
+  #btn-add { background: var(--red-light); }
+  #btn-add svg path, #btn-add svg circle { stroke: var(--red); }
+  #btn-add span { color: var(--red); }
+  #btn-edit { background: var(--gray-bg); }
+  #btn-edit span { color: var(--text); }
+  #btn-crop { background: var(--gray-bg); }
+  #btn-crop span { color: var(--text); }
+  #action-row2 { display: flex; gap: 10px; }
+  #btn-replace {
+    flex: 1; height: 52px;
+    background: var(--white);
+    border: 1.5px solid var(--gray-border);
+    border-radius: var(--radius);
+    font-size: 15px; font-weight: 600;
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    cursor: pointer; font-family: inherit;
+    transition: transform 0.1s;
+  }
+  #btn-replace:active { transform: scale(0.97); }
+  #btn-save {
+    flex: 2; height: 52px;
+    background: var(--red);
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px; font-weight: 600;
+    color: white;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    cursor: pointer; font-family: inherit;
+    transition: transform 0.1s;
+  }
+  #btn-save:active { transform: scale(0.97); }
+
+  /* ── Mode pill ── */
+  #mode-badge {
+    display: none;
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.55);
+    color: white; font-size: 12px;
+    padding: 4px 12px; border-radius: 20px;
+    pointer-events: none;
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: white; font-size: 14px;
+    padding: 8px 20px; border-radius: 20px;
+    display: none; white-space: nowrap;
+    z-index: 999;
+  }
+
+  /* hidden file input */
+  #file-input { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <button id="btn-back" aria-label="返回">
+    <svg width="10" height="18" viewBox="0 0 10 18" fill="none">
+      <path d="M9 1L1 9L9 17" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <div id="topbar-title">
+    <h1>大字报截图批注器</h1>
+    <p>点一下，生成大字指引</p>
+  </div>
+  <button id="btn-clear">清空</button>
+</div>
+
+<!-- Hint bar -->
+<div id="hint-bar">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <path d="M9 11l3 3L22 4" stroke="#C49200" stroke-width="2" stroke-linecap="round"/>
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="#C49200" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span>使用方法：在图片上点击位置，添加指引文字</span>
+</div>
+
+<!-- Canvas area (dynamic height) -->
+<div id="canvas-area">
+  <img id="bg-img" style="display:none" alt="">
+  <canvas id="anno-canvas"></canvas>
+  <div id="upload-prompt">
+    <div class="icon-wrap">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="3" width="18" height="18" rx="3" stroke="#BBBBBB" stroke-width="1.5"/>
+        <circle cx="8.5" cy="8.5" r="1.5" fill="#BBBBBB"/>
+        <path d="M3 15l5-5 4 4 3-3 5 5" stroke="#BBBBBB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span>点击下方「更换图片」上传截图</span>
+  </div>
+  <div id="tap-hint">👆 点击图片任意位置添加指引</div>
+  <div id="mode-badge">添加指引模式</div>
+</div>
+
+<!-- Step input panel -->
+<div id="step-panel"></div>
+
+<!-- Bottom actions -->
+<div id="action-bar">
+  <div id="action-row1">
+    <button class="action-btn active" id="btn-add">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="#E8211A" stroke-width="2"/>
+        <path d="M12 8v8M8 12h8" stroke="#E8211A" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>添加指引</span>
+    </button>
+    <button class="action-btn" id="btn-edit">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="2" fill="#333"/>
+        <path d="M12 3a9 9 0 1 0 0 18A9 9 0 0 0 12 3z" stroke="#333" stroke-width="1.5"/>
+        <path d="M12 8v1M12 15v1M8 12H7M17 12h-1" stroke="#333" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>编辑文字</span>
+    </button>
+    <button class="action-btn" id="btn-crop">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>调整图片</span>
+    </button>
+  </div>
+  <div id="action-row2">
+    <button id="btn-replace">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="3" width="18" height="18" rx="3" stroke="#333" stroke-width="1.5"/>
+        <path d="M3 15l5-5 4 4 3-3 5 5" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      更换图片
+    </button>
+    <button id="btn-save">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M12 16l-4-4h3V4h2v8h3l-4 4z" fill="white"/>
+        <path d="M4 20h16" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      保存/分享图片
+    </button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<input type="file" id="file-input" accept="image/*">
+
+<script>
+const canvasArea = document.getElementById('canvas-area');
+const bgImg = document.getElementById('bg-img');
+const annoCanvas = document.getElementById('anno-canvas');
+const ctx = annoCanvas.getContext('2d');
+const stepPanel = document.getElementById('step-panel');
+const uploadPrompt = document.getElementById('upload-prompt');
+const tapHint = document.getElementById('tap-hint');
+const fileInput = document.getElementById('file-input');
+
+let annotations = [];
+let imgEl = new Image();
+let imgLoaded = false;
+let mode = 'add'; // 'add' | 'edit' | 'crop'
+
+// ── Layout ──
+function layoutCanvas() {
+  const topbar = document.getElementById('topbar').offsetHeight;
+  const hintBar = document.getElementById('hint-bar').offsetHeight;
+  const stepH = stepPanel.offsetHeight;
+  const actionH = document.getElementById('action-bar').offsetHeight;
+  const total = window.innerHeight;
+  const avail = total - topbar - hintBar - stepH - actionH;
+  canvasArea.style.height = Math.max(avail, 120) + 'px';
+  resizeAnnoCanvas();
+  redraw();
+}
+
+function resizeAnnoCanvas() {
+  annoCanvas.width = canvasArea.offsetWidth;
+  annoCanvas.height = canvasArea.offsetHeight;
+}
+
+// ── Image loading ──
+function loadImageSrc(src) {
+  imgEl = new Image();
+  imgEl.onload = () => {
+    bgImg.src = src;
+    bgImg.style.display = 'block';
+    uploadPrompt.style.display = 'none';
+    tapHint.style.display = 'block';
+    imgLoaded = true;
+    annotations = [];
+    renderStepPanel();
+    layoutCanvas();
+  };
+  imgEl.src = src;
+}
+
+function getImgRect() {
+  const cw = annoCanvas.width, ch = annoCanvas.height;
+  const iw = imgEl.naturalWidth, ih = imgEl.naturalHeight;
+  if (!iw || !ih) return { ox: 0, oy: 0, dw: cw, dh: ch, scale: 1 };
+  const scale = Math.min(cw / iw, ch / ih);
+  const dw = iw * scale, dh = ih * scale;
+  const ox = (cw - dw) / 2, oy = (ch - dh) / 2;
+  return { ox, oy, dw, dh, scale };
+}
+
+// ── Drawing ──
+function drawOne(c, ann, idx, scale) {
+  const { x, y, text } = ann;
+  const num = idx + 1;
+  const r = Math.round(Math.max(22, 26 * scale));
+  const cw = c.canvas.width;
+
+  c.save();
+
+  // Ripple rings
+  [r * 1.6, r * 2.3, r * 3.1].forEach((pr, i) => {
+    c.beginPath();
+    c.arc(x, y, pr, 0, Math.PI * 2);
+    c.strokeStyle = `rgba(232,33,26,${0.22 - i * 0.06})`;
+    c.lineWidth = Math.max(2.5, 3.5 * scale);
+    c.stroke();
+  });
+
+  // Main circle fill
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.strokeStyle = '#E8211A';
+  c.lineWidth = Math.max(4, 5 * scale);
+  c.stroke();
+  c.fillStyle = 'rgba(232,33,26,0.10)';
+  c.fill();
+
+  // Number circle
+  c.beginPath();
+  c.arc(x, y, r * 0.52, 0, Math.PI * 2);
+  c.fillStyle = '#E8211A';
+  c.fill();
+  c.font = `700 ${Math.max(13, 15 * scale)}px -apple-system, PingFang SC, sans-serif`;
+  c.fillStyle = 'white';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(num, x, y + 0.5);
+
+  // Label box sizing
+  const displayText = (text && text.trim()) ? text.trim() : '点这里！';
+  const fontSize = Math.max(20, 26 * scale);
+  c.font = `700 ${fontSize}px -apple-system, PingFang SC, sans-serif`;
+  const textW = c.measureText(displayText).width;
+  const labelW = textW + Math.max(24, 28 * scale);
+  const labelH = Math.max(46, 52 * scale);
+  const rx2 = Math.max(8, 10 * scale);
+
+  // Decide direction
+  const rightSpace = cw - x;
+  const leftSpace = x;
+  let lx, arrowEnd;
+  const arrowGap = r * 3.0;
+
+  if (rightSpace > leftSpace) {
+    lx = x + arrowGap;
+    arrowEnd = { x: lx, y: y };
+  } else {
+    lx = x - arrowGap - labelW;
+    arrowEnd = { x: lx + labelW, y: y };
+  }
+  const ly = y - labelH / 2;
+
+  // Arrow
+  const arrowStart = rightSpace > leftSpace
+    ? { x: x + r * 1.15, y }
+    : { x: x - r * 1.15, y };
+
+  c.beginPath();
+  c.moveTo(arrowStart.x, arrowStart.y);
+  c.lineTo(arrowEnd.x, arrowEnd.y);
+  c.strokeStyle = '#E8211A';
+  c.lineWidth = Math.max(3, 3.5 * scale);
+  c.stroke();
+
+  // Arrowhead
+  const ang = Math.atan2(arrowEnd.y - arrowStart.y, arrowEnd.x - arrowStart.x);
+  const al = Math.max(10, 13 * scale);
+  c.beginPath();
+  c.moveTo(arrowEnd.x, arrowEnd.y);
+  c.lineTo(arrowEnd.x - al * Math.cos(ang - 0.38), arrowEnd.y - al * Math.sin(ang - 0.38));
+  c.lineTo(arrowEnd.x - al * Math.cos(ang + 0.38), arrowEnd.y - al * Math.sin(ang + 0.38));
+  c.closePath();
+  c.fillStyle = '#E8211A';
+  c.fill();
+
+  // Label box
+  c.beginPath();
+  c.roundRect(lx, ly, labelW, labelH, rx2);
+  c.strokeStyle = '#E8211A';
+  c.lineWidth = Math.max(2.5, 3 * scale);
+  c.stroke();
+  c.fillStyle = 'rgba(255,255,255,0.97)';
+  c.fill();
+
+  // Label text
+  c.font = `700 ${fontSize}px -apple-system, PingFang SC, sans-serif`;
+  c.fillStyle = '#E8211A';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(displayText, lx + labelW / 2, ly + labelH / 2);
+
+  c.restore();
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, annoCanvas.width, annoCanvas.height);
+  if (!imgLoaded) return;
+  const { scale } = getImgRect();
+  annotations.forEach((ann, i) => drawOne(ctx, ann, i, scale));
+}
+
+// ── Step panel ──
+function renderStepPanel() {
+  stepPanel.innerHTML = '';
+  annotations.forEach((ann, i) => {
+    const row = document.createElement('div');
+    row.className = 'step-row';
+    row.innerHTML = `
+      <div class="step-badge">${i + 1}</div>
+      <input class="step-input" type="text" value="${ann.text || ''}" placeholder="点这里！" data-i="${i}" inputmode="text">
+      <button class="step-del" data-i="${i}" aria-label="删除">✕</button>
+    `;
+    stepPanel.appendChild(row);
+  });
+  stepPanel.querySelectorAll('.step-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      annotations[+e.target.dataset.i].text = e.target.value;
+      redraw();
+    });
+    inp.addEventListener('focus', () => {
+      setTimeout(layoutCanvas, 350);
+    });
+    inp.addEventListener('blur', layoutCanvas);
+  });
+  stepPanel.querySelectorAll('.step-del').forEach(btn => {
+    btn.addEventListener('click', e => {
+      annotations.splice(+e.target.dataset.i, 1);
+      renderStepPanel();
+      redraw();
+      layoutCanvas();
+    });
+  });
+  layoutCanvas();
+}
+
+// ── Tap on canvas ──
+canvasArea.addEventListener('click', e => {
+  if (!imgLoaded || mode !== 'add') return;
+  const rect = canvasArea.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  annotations.push({ x, y, text: '' });
+  renderStepPanel();
+  redraw();
+  setTimeout(() => {
+    const inputs = stepPanel.querySelectorAll('.step-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 80);
+});
+
+// Touch support
+canvasArea.addEventListener('touchend', e => {
+  if (!imgLoaded || mode !== 'add') return;
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  const rect = canvasArea.getBoundingClientRect();
+  const x = t.clientX - rect.left;
+  const y = t.clientY - rect.top;
+  annotations.push({ x, y, text: '' });
+  renderStepPanel();
+  redraw();
+  setTimeout(() => {
+    const inputs = stepPanel.querySelectorAll('.step-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 80);
+}, { passive: false });
+
+// ── Mode buttons ──
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+  if (m === 'add') { document.getElementById('btn-add').classList.add('active'); showToast('点击图片，自动生成红圈指引'); }
+  if (m === 'edit') { document.getElementById('btn-edit').classList.add('active'); showToast('在下方文字框修改说明内容'); }
+  if (m === 'crop') { document.getElementById('btn-crop').classList.add('active'); showToast('调整图片功能（可扩展）'); }
+}
+document.getElementById('btn-add').addEventListener('click', () => setMode('add'));
+document.getElementById('btn-edit').addEventListener('click', () => setMode('edit'));
+document.getElementById('btn-crop').addEventListener('click', () => setMode('crop'));
+
+// ── File buttons ──
+document.getElementById('btn-replace').addEventListener('click', () => fileInput.click());
+document.getElementById('btn-clear').addEventListener('click', () => {
+  annotations = [];
+  renderStepPanel();
+  redraw();
+});
+document.getElementById('btn-back').addEventListener('click', () => {
+  if (history.length > 1) history.back();
+});
+
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => loadImageSrc(ev.target.result);
+  reader.readAsDataURL(file);
+  fileInput.value = '';
+});
+
+// Paste support
+document.addEventListener('paste', e => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = ev => loadImageSrc(ev.target.result);
+      reader.readAsDataURL(blob);
+      break;
+    }
+  }
+});
+
+// ── Save ──
+document.getElementById('btn-save').addEventListener('click', () => {
+  if (!imgLoaded) { showToast('请先上传图片'); return; }
+  const { ox, oy, dw, dh } = getImgRect();
+  const ec = document.createElement('canvas');
+  ec.width = imgEl.naturalWidth;
+  ec.height = imgEl.naturalHeight;
+  const ectx = ec.getContext('2d');
+  ectx.drawImage(imgEl, 0, 0);
+  const scaleBack = imgEl.naturalWidth / dw;
+  annotations.forEach((ann, i) => {
+    drawOne(ectx, {
+      ...ann,
+      x: (ann.x - ox) * scaleBack,
+      y: (ann.y - oy) * scaleBack
+    }, i, 1);
+  });
+
+  // Try share API first (mobile)
+  ec.toBlob(async blob => {
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], '批注.png', { type: 'image/png' })] })) {
+      try {
+        await navigator.share({
+          files: [new File([blob], '批注.png', { type: 'image/png' })],
+          title: '大字报截图批注'
+        });
+        return;
+      } catch {}
+    }
+    // Fallback: download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '批注图片.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    showToast('图片已保存');
+  }, 'image/png');
+});
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2000);
+}
+
+// ── Resize ──
+window.addEventListener('resize', layoutCanvas);
+window.addEventListener('orientationchange', () => setTimeout(layoutCanvas, 300));
+document.addEventListener('DOMContentLoaded', layoutCanvas);
+layoutCanvas();
+</script>
+</body>
+</html>
